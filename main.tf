@@ -1,5 +1,5 @@
 /**
- * Copyright 2022 Google LLC
+ * Copyright 2019 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,113 +15,61 @@
  */
 
 locals {
-  prefix       = var.prefix == null ? "" : "${var.prefix}-"
-  notification = try(var.notification_config.enabled, false)
+  buckets = (
+    local.has_buckets
+    ? [for name in var.names : google_storage_bucket.buckets[name]]
+    : []
+  )
+  # needed when destroying
+  has_buckets = length(google_storage_bucket.buckets) > 0
+  iam_pairs = var.iam_roles == null ? [] : flatten([
+    for name, roles in var.iam_roles :
+    [for role in roles : { name = name, role = role }]
+  ])
+  iam_keypairs = {
+    for pair in local.iam_pairs :
+    "${pair.name}-${pair.role}" => pair
+  }
+  iam_members = var.iam_members == null ? {} : var.iam_members
+  prefix = (
+    var.prefix == null || var.prefix == "" # keep "" for backward compatibility
+    ? ""
+    : join("-", [var.prefix, lower(var.location), ""])
+  )
+  kms_keys = { for name in var.names : name => lookup(var.encryption_keys, name, null) }
 }
 
-resource "google_storage_bucket" "bucket" {
-  name                        = "${local.prefix}${lower(var.name)}"
-  project                     = var.project_id
-  location                    = var.location
-  storage_class               = var.storage_class
-  force_destroy               = var.force_destroy
-  uniform_bucket_level_access = var.uniform_bucket_level_access
-  labels                      = var.labels
+resource "google_storage_bucket" "buckets" {
+  for_each           = toset(var.names)
+  name               = "${local.prefix}${lower(each.key)}"
+  project            = var.project_id
+  location           = var.location
+  storage_class      = var.storage_class
+  force_destroy      = lookup(var.force_destroy, each.key, false)
+  bucket_policy_only = lookup(var.bucket_policy_only, each.key, true)
   versioning {
-    enabled = var.versioning
+    enabled = lookup(var.versioning, each.key, false)
   }
+  labels = merge(var.labels, {
+    location      = lower(var.location)
+    name          = lower(each.key)
+    storage_class = lower(var.storage_class)
+  })
 
-  dynamic "website" {
-    for_each = var.website == null ? [] : [""]
+  dynamic encryption {
+    for_each = local.kms_keys[each.key] == null ? [] : [""]
 
     content {
-      main_page_suffix = var.website.main_page_suffix
-      not_found_page   = var.website.not_found_page
-    }
-  }
-
-  dynamic "encryption" {
-    for_each = var.encryption_key == null ? [] : [""]
-
-    content {
-      default_kms_key_name = var.encryption_key
-    }
-  }
-
-  dynamic "retention_policy" {
-    for_each = var.retention_policy == null ? [] : [""]
-    content {
-      retention_period = var.retention_policy.retention_period
-      is_locked        = var.retention_policy.is_locked
-    }
-  }
-
-  dynamic "logging" {
-    for_each = var.logging_config == null ? [] : [""]
-    content {
-      log_bucket        = var.logging_config.log_bucket
-      log_object_prefix = var.logging_config.log_object_prefix
-    }
-  }
-
-  dynamic "cors" {
-    for_each = var.cors == null ? [] : [""]
-    content {
-      origin          = var.cors.origin
-      method          = var.cors.method
-      response_header = var.cors.response_header
-      max_age_seconds = max(3600, var.cors.max_age_seconds)
-    }
-  }
-
-  dynamic "lifecycle_rule" {
-    for_each = var.lifecycle_rule == null ? [] : [""]
-    content {
-      action {
-        type          = var.lifecycle_rule.action["type"]
-        storage_class = var.lifecycle_rule.action["storage_class"]
-      }
-      condition {
-        age                        = var.lifecycle_rule.condition["age"]
-        created_before             = var.lifecycle_rule.condition["created_before"]
-        with_state                 = var.lifecycle_rule.condition["with_state"]
-        matches_storage_class      = var.lifecycle_rule.condition["matches_storage_class"]
-        num_newer_versions         = var.lifecycle_rule.condition["num_newer_versions"]
-        custom_time_before         = var.lifecycle_rule.condition["custom_time_before"]
-        days_since_custom_time     = var.lifecycle_rule.condition["days_since_custom_time"]
-        days_since_noncurrent_time = var.lifecycle_rule.condition["days_since_noncurrent_time"]
-        noncurrent_time_before     = var.lifecycle_rule.condition["noncurrent_time_before"]
-      }
+      default_kms_key_name = local.kms_keys[each.key]
     }
   }
 }
 
 resource "google_storage_bucket_iam_binding" "bindings" {
-  for_each = var.iam
-  bucket   = google_storage_bucket.bucket.name
-  role     = each.key
-  members  = each.value
-}
-
-resource "google_storage_notification" "notification" {
-  count             = local.notification ? 1 : 0
-  bucket            = google_storage_bucket.bucket.name
-  payload_format    = var.notification_config.payload_format
-  topic             = google_pubsub_topic.topic[0].id
-  event_types       = var.notification_config.event_types
-  custom_attributes = var.notification_config.custom_attributes
-
-  depends_on = [google_pubsub_topic_iam_binding.binding]
-
-}
-resource "google_pubsub_topic_iam_binding" "binding" {
-  count   = local.notification ? 1 : 0
-  topic   = google_pubsub_topic.topic[0].id
-  role    = "roles/pubsub.publisher"
-  members = ["serviceAccount:${var.notification_config.sa_email}"]
-}
-resource "google_pubsub_topic" "topic" {
-  count   = local.notification ? 1 : 0
-  project = var.project_id
-  name    = var.notification_config.topic_name
+  for_each = local.iam_keypairs
+  bucket   = google_storage_bucket.buckets[each.value.name].name
+  role     = each.value.role
+  members = lookup(
+    lookup(local.iam_members, each.value.name, {}), each.value.role, []
+  )
 }
