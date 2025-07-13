@@ -1,5 +1,5 @@
 /**
- * Copyright 2023 Google LLC
+ * Copyright 2022 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,11 @@
  */
 
 locals {
-  prefix       = var.prefix == null ? "" : "${var.prefix}-"
+  prefix = (
+    var.prefix == null || var.prefix == "" # keep "" for backward compatibility
+    ? ""
+    : "${var.prefix}-"
+  )
   notification = try(var.notification_config.enabled, false)
 }
 
@@ -27,18 +31,8 @@ resource "google_storage_bucket" "bucket" {
   force_destroy               = var.force_destroy
   uniform_bucket_level_access = var.uniform_bucket_level_access
   labels                      = var.labels
-  default_event_based_hold    = var.default_event_based_hold
-  requester_pays              = var.requester_pays
-  public_access_prevention    = var.public_access_prevention
   versioning {
     enabled = var.versioning
-  }
-
-  dynamic "autoclass" {
-    for_each = var.autoclass == null ? [] : [""]
-    content {
-      enabled = var.autoclass
-    }
   }
 
   dynamic "website" {
@@ -85,76 +79,44 @@ resource "google_storage_bucket" "bucket" {
   }
 
   dynamic "lifecycle_rule" {
-    for_each = var.lifecycle_rules
-    iterator = rule
+    for_each = var.lifecycle_rule == null ? [] : [""]
     content {
       action {
-        type          = rule.value.action.type
-        storage_class = rule.value.action.storage_class
+        type          = var.lifecycle_rule.action["type"]
+        storage_class = var.lifecycle_rule.action["storage_class"]
       }
       condition {
-        age                        = rule.value.condition.age
-        created_before             = rule.value.condition.created_before
-        custom_time_before         = rule.value.condition.custom_time_before
-        days_since_custom_time     = rule.value.condition.days_since_custom_time
-        days_since_noncurrent_time = rule.value.condition.days_since_noncurrent_time
-        matches_prefix             = rule.value.condition.matches_prefix
-        matches_storage_class      = rule.value.condition.matches_storage_class
-        matches_suffix             = rule.value.condition.matches_suffix
-        noncurrent_time_before     = rule.value.condition.noncurrent_time_before
-        num_newer_versions         = rule.value.condition.num_newer_versions
-        with_state                 = rule.value.condition.with_state
+        age                        = var.lifecycle_rule.condition["age"]
+        created_before             = var.lifecycle_rule.condition["created_before"]
+        with_state                 = var.lifecycle_rule.condition["with_state"]
+        matches_storage_class      = var.lifecycle_rule.condition["matches_storage_class"]
+        num_newer_versions         = var.lifecycle_rule.condition["num_newer_versions"]
+        custom_time_before         = var.lifecycle_rule.condition["custom_time_before"]
+        days_since_custom_time     = var.lifecycle_rule.condition["days_since_custom_time"]
+        days_since_noncurrent_time = var.lifecycle_rule.condition["days_since_noncurrent_time"]
+        noncurrent_time_before     = var.lifecycle_rule.condition["noncurrent_time_before"]
       }
-    }
-  }
-
-  dynamic "custom_placement_config" {
-    for_each = var.custom_placement_config == null ? [] : [""]
-
-    content {
-      data_locations = var.custom_placement_config
     }
   }
 }
 
-resource "google_storage_bucket_object" "objects" {
-  for_each = var.objects_to_upload
-
-  bucket              = google_storage_bucket.bucket.id
-  name                = each.value.name
-  metadata            = each.value.metadata
-  content             = each.value.content
-  source              = each.value.source
-  cache_control       = each.value.cache_control
-  content_disposition = each.value.content_disposition
-  content_encoding    = each.value.content_encoding
-  content_language    = each.value.content_language
-  content_type        = each.value.content_type
-  event_based_hold    = each.value.event_based_hold
-  temporary_hold      = each.value.temporary_hold
-  detect_md5hash      = each.value.detect_md5hash
-  storage_class       = each.value.storage_class
-  kms_key_name        = each.value.kms_key_name
-
-  dynamic "customer_encryption" {
-    for_each = each.value.customer_encryption == null ? [] : [""]
-
-    content {
-      encryption_algorithm = each.value.customer_encryption.encryption_algorithm
-      encryption_key       = each.value.customer_encryption.encryption_key
-    }
-  }
+resource "google_storage_bucket_iam_binding" "bindings" {
+  for_each = var.iam
+  bucket   = google_storage_bucket.bucket.name
+  role     = each.key
+  members  = each.value
 }
 
 resource "google_storage_notification" "notification" {
-  count              = local.notification ? 1 : 0
-  bucket             = google_storage_bucket.bucket.name
-  payload_format     = var.notification_config.payload_format
-  topic              = google_pubsub_topic.topic[0].id
-  custom_attributes  = var.notification_config.custom_attributes
-  event_types        = var.notification_config.event_types
-  object_name_prefix = var.notification_config.object_name_prefix
-  depends_on         = [google_pubsub_topic_iam_binding.binding]
+  count             = local.notification ? 1 : 0
+  bucket            = google_storage_bucket.bucket.name
+  payload_format    = var.notification_config.payload_format
+  topic             = google_pubsub_topic.topic[0].id
+  event_types       = var.notification_config.event_types
+  custom_attributes = var.notification_config.custom_attributes
+
+  depends_on = [google_pubsub_topic_iam_binding.binding]
+
 }
 resource "google_pubsub_topic_iam_binding" "binding" {
   count   = local.notification ? 1 : 0
