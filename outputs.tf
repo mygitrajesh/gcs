@@ -1,5 +1,5 @@
 /**
- * Copyright 2025 Google LLC
+ * Copyright 2020 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,60 +16,15 @@
 
 output "bucket" {
   description = "Bucket resource."
-  value       = one(google_storage_bucket.bucket)
-}
-
-# We add `id` as an alias to `name` to simplify log sink handling.
-# Since all other log destinations (pubsub, logging-bucket, bigquery)
-# have an id output, it is convenient to have in this module too to
-# handle all log destination as homogeneous objects (i.e. you can
-# assume any valid log destination has an `id` output).
-
-output "id" {
-  description = "Fully qualified bucket id."
-  value       = local._name
-  depends_on = [
-    google_storage_bucket.bucket,
-    google_storage_bucket_iam_binding.bindings,
-    google_storage_bucket_iam_binding.authoritative,
-    google_storage_bucket_iam_member.bindings
-  ]
+  value       = google_storage_bucket.bucket
 }
 
 output "name" {
   description = "Bucket name."
-  value       = local._name
-  depends_on = [
-    google_storage_bucket.bucket,
-    google_storage_bucket_iam_binding.bindings,
-    google_storage_bucket_iam_binding.authoritative,
-    google_storage_bucket_iam_member.bindings
-  ]
-}
-
-output "notification" {
-  description = "GCS Notification self link."
-  value       = local.notification ? google_storage_notification.notification[0].self_link : null
-}
-
-output "objects" {
-  description = "Objects in GCS bucket."
-  value = { for k, v in google_storage_bucket_object.objects : k => {
-    crc32c      = v.crc32c
-    md5hash     = v.md5hash
-    self_link   = v.self_link
-    output_name = v.output_name
-    media_link  = v.media_link
-    }
-  }
-}
-
-output "topic" {
-  description = "Topic ID used by GCS."
-  value       = try(google_pubsub_topic.topic[0].id, null)
+  value       = google_storage_bucket.bucket.name
 }
 
 output "url" {
   description = "Bucket URL."
-  value       = local.bucket.url
+  value       = google_storage_bucket.bucket.url
 }
