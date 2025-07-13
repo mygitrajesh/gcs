@@ -1,5 +1,5 @@
 /**
- * Copyright 2019 Google LLC
+ * Copyright 2020 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,8 +36,15 @@ locals {
     ? ""
     : join("-", [var.prefix, lower(var.location), ""])
   )
-  kms_keys = { for name in var.names : name => lookup(var.encryption_keys, name, null) }
-  retention_policy = { for name in var.names : name => lookup(var.retention_policies, name, null) }
+  kms_keys = {
+    for name in var.names : name => lookup(var.encryption_keys, name, null)
+  }
+  retention_policy = {
+    for name in var.names : name => lookup(var.retention_policies, name, null)
+  }
+  logging_config = {
+    for name in var.names : name => lookup(var.logging_config, name, null)
+  }
 }
 
 resource "google_storage_bucket" "buckets" {
@@ -47,7 +54,7 @@ resource "google_storage_bucket" "buckets" {
   location           = var.location
   storage_class      = var.storage_class
   force_destroy      = lookup(var.force_destroy, each.key, false)
-  bucket_policy_only = lookup(var.bucket_policy_only, each.key, true)
+  uniform_bucket_level_access = lookup(var.uniform_bucket_level_access, each.key, true)
   versioning {
     enabled = lookup(var.versioning, each.key, false)
   }
@@ -69,7 +76,15 @@ resource "google_storage_bucket" "buckets" {
     for_each = local.retention_policy[each.key] == null ? [] : [""]
     content {
       retention_period = local.retention_policy[each.key]["retention_period"]
-      is_locked = lookup(local.retention_policy[each.key], "is_locked", false)
+      is_locked        = local.retention_policy[each.key]["is_locked"]
+    }
+  }
+
+  dynamic logging {
+    for_each = local.logging_config[each.key] == null ? [] : [""]
+    content {
+      log_bucket        = local.logging_config[each.key]["log_bucket"]
+      log_object_prefix = local.logging_config[each.key]["log_object_prefix"]
     }
   }
 }

@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-variable "bucket_policy_only" {
-  description = "Optional map to disable object ACLS keyed by name, defaults to true."
+variable "uniform_bucket_level_access" {
+  description = "Optional map to allow using object ACLs (false) or not (true, this is the recommended behavior) , defaults to true (which is the recommended practice, but not the behavior of storage API)."
   type        = map(bool)
   default     = {}
 }
@@ -56,6 +56,15 @@ variable "location" {
   default     = "EU"
 }
 
+variable "logging_config" {
+  description = "Per-bucket logging."
+  type = map(object({
+    log_bucket        = string
+    log_object_prefix = string
+  }))
+  default = {}
+}
+
 variable "names" {
   description = "Bucket name suffixes."
   type        = list(string)
@@ -72,6 +81,15 @@ variable "project_id" {
   type        = string
 }
 
+variable "retention_policies" {
+  description = "Per-bucket retention policy."
+  type = map(object({
+    retention_period = number
+    is_locked        = bool
+  }))
+  default = {}
+}
+
 variable "storage_class" {
   description = "Bucket storage class."
   type        = string
@@ -81,11 +99,5 @@ variable "storage_class" {
 variable "versioning" {
   description = "Optional map to set versioning keyed by name, defaults to false."
   type        = map(bool)
-  default     = {}
-}
-
-variable "retention_policies" {
-  description = "Per-bucket retention policy."
-  type        = map(map(string))
   default     = {}
 }
