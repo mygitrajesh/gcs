@@ -1,5 +1,5 @@
 /**
- * Copyright 2021 Google LLC
+ * Copyright 2022 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,11 @@ output "bucket" {
 
 output "name" {
   description = "Bucket name."
-  value       = google_storage_bucket.bucket.name
+  value       = "${local.prefix}${lower(var.name)}"
+  depends_on = [
+    google_storage_bucket.bucket,
+    google_storage_bucket_iam_binding.bindings
+  ]
 }
 output "notification" {
   description = "GCS Notification self link."
