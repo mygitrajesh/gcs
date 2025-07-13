@@ -45,8 +45,35 @@ module "buckets" {
   iam_roles = {
     bucket-two = ["roles/storage.admin"]
   }
-  kms_keys = {
+  encryption_keys = {
     bucket-two = local.kms_key.self_link,
+  }
+}
+```
+
+### Example with retention policy
+
+```hcl
+module "buckets" {
+  source     = "./modules/gcs"
+  project_id = "myproject"
+  prefix     = "test"
+  names      = ["bucket-one", "bucket-two"]
+  bucket_policy_only = {
+    bucket-one = false
+  }
+  iam_members = {
+    bucket-two = {
+      "roles/storage.admin" = ["group:storage@example.com"]
+    }
+  }
+  iam_roles = {
+    bucket-two = ["roles/storage.admin"]
+  }
+
+  retention_policies = {
+    bucket-one = { retention_period = 100 , is_locked = true}
+    bucket-two = { retention_period = 900 }
   }
 }
 ```
@@ -66,6 +93,7 @@ module "buckets" {
 | *labels* | Labels to be attached to all buckets. | <code title="map&#40;string&#41;">map(string)</code> |  | <code title="">{}</code> |
 | *location* | Bucket location. | <code title="">string</code> |  | <code title="">EU</code> |
 | *prefix* | Prefix used to generate the bucket name. | <code title="">string</code> |  | <code title="">null</code> |
+| *retention_policies* | Per-bucket retention policy. | <code title="map&#40;map&#40;string&#41;&#41;">map(map(string))</code> |  | <code title="">{}</code> |
 | *storage_class* | Bucket storage class. | <code title="">string</code> |  | <code title="">MULTI_REGIONAL</code> |
 | *versioning* | Optional map to set versioning keyed by name, defaults to false. | <code title="map&#40;bool&#41;">map(bool)</code> |  | <code title="">{}</code> |
 
