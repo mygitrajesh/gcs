@@ -29,14 +29,19 @@ resource "google_storage_bucket" "bucket" {
   storage_class               = var.storage_class
   force_destroy               = var.force_destroy
   uniform_bucket_level_access = var.uniform_bucket_level_access
+  labels                      = var.labels
   versioning {
     enabled = var.versioning
   }
-  labels = merge(var.labels, {
-    location      = lower(var.location)
-    name          = lower(var.name)
-    storage_class = lower(var.storage_class)
-  })
+
+  dynamic "website" {
+    for_each = var.website == null ? [] : [""]
+
+    content {
+      main_page_suffix = var.website.main_page_suffix
+      not_found_page   = var.website.not_found_page
+    }
+  }
 
   dynamic "encryption" {
     for_each = var.encryption_key == null ? [] : [""]
