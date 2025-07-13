@@ -3,7 +3,7 @@
 
 ```hcl
 module "bucket" {
-  source     = "./modules/gcs"
+  source     = "./fabric/modules/gcs"
   project_id = "myproject"
   prefix     = "test"
   name       = "my-bucket"
@@ -18,7 +18,7 @@ module "bucket" {
 
 ```hcl
 module "bucket" {
-  source     = "./modules/gcs"
+  source     = "./fabric/modules/gcs"
   project_id = "myproject"
   prefix     = "test"
   name       = "my-bucket"
@@ -34,7 +34,7 @@ module "bucket" {
 
 ```hcl
 module "bucket" {
-  source     = "./modules/gcs"
+  source     = "./fabric/modules/gcs"
   project_id = "myproject"
   prefix     = "test"
   name       = "my-bucket"
@@ -59,7 +59,7 @@ module "bucket" {
 
 ```hcl
 module "bucket" {
-  source     = "./modules/gcs"
+  source     = "./fabric/modules/gcs"
   project_id = "myproject"
   prefix     = "test"
   name      = "my-bucket"
@@ -91,7 +91,7 @@ module "bucket" {
 ### Minimal example with GCS notifications
 ```hcl
 module "bucket-gcs-notification" {
-  source     = "./modules/gcs"
+  source     = "./fabric/modules/gcs"
   project_id = "myproject"
   prefix     = "test"
   name       = "my-bucket"
@@ -135,9 +135,10 @@ module "bucket-gcs-notification" {
 | name | description | sensitive |
 |---|---|:---:|
 | [bucket](outputs.tf#L17) | Bucket resource. |  |
-| [name](outputs.tf#L22) | Bucket name. |  |
-| [notification](outputs.tf#L30) | GCS Notification self link. |  |
-| [topic](outputs.tf#L34) | Topic ID used by GCS. |  |
-| [url](outputs.tf#L38) | Bucket URL. |  |
+| [id](outputs.tf#L28) | Bucket ID (same as name). |  |
+| [name](outputs.tf#L37) | Bucket name. |  |
+| [notification](outputs.tf#L46) | GCS Notification self link. |  |
+| [topic](outputs.tf#L51) | Topic ID used by GCS. |  |
+| [url](outputs.tf#L56) | Bucket URL. |  |
 
 <!-- END TFDOC -->
