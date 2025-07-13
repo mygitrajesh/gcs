@@ -1,5 +1,5 @@
 /**
- * Copyright 2018 Google LLC
+ * Copyright 2022 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,49 +15,57 @@
  */
 
 output "bucket" {
-  description = "Bucket resource (for single use)."
-  value       = local.has_buckets ? local.buckets[0] : null
+  description = "Bucket resource."
+  value       = google_storage_bucket.bucket
+}
+
+# We add `id` as an alias to `name` to simplify log sink handling.
+# Since all other log destinations (pubsub, logging-bucket, bigquery)
+# have an id output, it is convenient to have in this module too to
+# handle all log destination as homogeneous objects (i.e. you can
+# assume any valid log destination has an `id` output).
+
+output "id" {
+  description = "Fully qualified bucket id."
+  value       = "${local.prefix}${lower(var.name)}"
+  depends_on = [
+    google_storage_bucket.bucket,
+    google_storage_bucket_iam_binding.bindings
+  ]
 }
 
 output "name" {
-  description = "Bucket name (for single use)."
-  value       = local.has_buckets ? local.buckets[0].name : null
+  description = "Bucket name."
+  value       = "${local.prefix}${lower(var.name)}"
+  depends_on = [
+    google_storage_bucket.bucket,
+    google_storage_bucket_iam_binding.bindings
+  ]
+}
+
+output "notification" {
+  description = "GCS Notification self link."
+  value       = local.notification ? google_storage_notification.notification[0].self_link : null
+}
+
+output "objects" {
+  description = "Objects in GCS bucket."
+  value = { for k, v in google_storage_bucket_object.objects : k => {
+    crc32c      = v.crc32c
+    md5hash     = v.md5hash
+    self_link   = v.self_link
+    output_name = v.output_name
+    media_link  = v.media_link
+    }
+  }
+}
+
+output "topic" {
+  description = "Topic ID used by GCS."
+  value       = local.notification ? google_pubsub_topic.topic[0].id : null
 }
 
 output "url" {
-  description = "Bucket URL (for single use)."
-  value       = local.has_buckets ? local.buckets[0].url : null
-}
-
-output "buckets" {
-  description = "Bucket resources."
-  value       = local.buckets
-}
-
-output "names" {
-  description = "Bucket names."
-  value = (
-    local.has_buckets
-    ? zipmap(var.names, [for b in local.buckets : lookup(b, "name", null)])
-    : {}
-  )
-}
-
-output "urls" {
-  description = "Bucket URLs."
-  value = (
-    local.has_buckets
-    ? zipmap(var.names, [for b in local.buckets : b.url])
-    : {}
-  )
-}
-
-output "names_list" {
-  description = "List of bucket names."
-  value       = [for b in local.buckets : b.name]
-}
-
-output "urls_list" {
-  description = "List of bucket URLs."
-  value       = [for b in local.buckets : b.name]
+  description = "Bucket URL."
+  value       = google_storage_bucket.bucket.url
 }
